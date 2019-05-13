@@ -5,7 +5,7 @@
 	* 单点登录
 	* 多域名访问
 	* Tomcat性能调优
-4. 基于BIO实现的，具体参考最后的tomcat的运作模式的笔记
+4. 参考视频: [https://www.imooc.com/learn/1114](https://www.imooc.com/learn/1114)
 
 #### 一、Tomcat概述以及运行原理
 
