@@ -51,3 +51,5 @@
 4. 再pom文件中，spring-boot-maven-plugin主要功能是为了我们再执行打包的过程当中，替我们生成一个可执行的jar包，命令为`mvn clean package -Dmaven.test.skip`
 5. 打包后再target文件夹内，生成的jar包会有两个，一个是origin的jar包，一个是带有依赖的jar包，使用的时候使用那个带有依赖的jar包，可以直接通过命令`java -jar hello-spring-0.0.1-SNAPSHOT.jar`运行程序
 6. 如果需要定义字节实现的parent，这里就需要建立一个新的<dependencyManagement>标签，将org.springframework.boot存放到<dependencies>标签下，也可以实现已知的目标<br/>![WeChata28d79c154370d3cfdd3031a73eb28e1.png](https://i.loli.net/2019/05/21/5ce383694aa8b93423.png)
+
+
