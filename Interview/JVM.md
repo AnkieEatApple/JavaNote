@@ -6,6 +6,7 @@
 - [四、类从编译到执行的过程](#classloader)
 - [五、类加载器的双亲委派机制](#Parental)
 - [六、类的加载方式](#loading)
+- [七、了解Java的内存模型么？](#memory)
 
 
 ##### 2. 对Java的理解
@@ -147,8 +148,128 @@ protected final Class<?> defineClass(byte[] b, int off, int len) throws ClassFor
 
 
 ### <span id="loading">六、类的加载方式</span>
-1. **隐式加载：new**
-2. **显示加载：loadClass、forName等** 
+1. **隐式加载：new**，隐式加载就不同newInstance方式加载，而new方式加载时可以通过构造函数传入参数
+2. **显示加载：loadClass、forName等**，对于显示加载来讲，当我们获取到了class对象了之后，需要调用class对象的newInstance方法来生成对象的实例。
+
+#### 6.1 loadClass和forName的区别
+1. 都能在运行的时候知道一个类
+2. 都能知道该类的属性和方法，也就是对于任意一个对象，都能调用它的任意方法和属性
+3. 类的装载(加载)过程，这里装载表示class的生成过程，加载表示其中一步骤
+	* **加载：**通过ClassLoader加载class文件字节码，生成Class对象。将class文件的字节码加载到内存中，并将这些静态数据转化为运行时的数据区中方法区的类型数据，在运行时，数据区堆中生成一个代表这个类的Java.lang.class对象，作为方法区内类数据的访问入口。
+	* **连接：**
+		* 校验：检查加载的class正确性和安全性
+		* 准备：为变量分配储存空间并设置类的变量初始值
+		* 解析：JVM将常量池内的符号引用转换为直接引用
+	* **初始化：**执行类变量赋值和静态代码块
+4. **ClassLoader.loadclass得到的class时还没有连接的**
+	* 正常对一个类直接调用获取ClassLoader是没有初始化的，`ClassLodaer cl = Robot.class.getClassLoader();`，中的static代码块没有输出
+	* 这种技术一般用在SpringIOC中，资源加载器获取要读入的资源的时候，读取一些Bean的配置文件的时候，如果是以Classpath的方式加载，就需要使用ClassLoader的方式来加载，这样主要是为了遵循Spring的LazyLoading的模式有关，为了加快初始化速度，大量的使用了LazyLoading的方式。ClassLoader不需要直接初始化，可以在有需要的时候初始化。
+5. **Class.forName得到的class时已经初始化完成了的**
+	* 直接执行这个class的时候可以初始化选定的类，可以试验一下就知道了，最常用的就是加载数据库的驱动，Class.forName("com.mysql.jdbc.Driver");
+
+
+
+### <span id="memory">七、了解Java的内存模型么？</span>
+1. 内存简介
+	* 计算机的所有内存都是运行在内存当中的
+	* 图释<br/>![WeChatc8118e2805f9ce1f9b830cd71749c768.png](https://i.loli.net/2019/08/12/fbBFgoUQlitMxqJ.png)  
+	* 在程序执行的过程中，需要不断的将内存的逻辑地址和物理地址进行映射，找到相关的指令去执行、
+	* Java作为操作系统进程，也面临着和其他进程相同的限制，即受限制与操作系统架构提供的可寻址地址空间。操作系统的架构提供的可寻址地址空间由处理器的位数决定
+	* 32位处理器：2^32 的可寻址范围 
+	* 64位处理器：2^64 的可寻址范围
+2. 地址空间的划分
+	* **内核空间**，操作系统的程序和程序运行时的空间，包含连接计算机硬件，调度程序，以及联网和提供虚拟内存等服务的逻辑与C的进程。
+	* **用户空间**，Java操作运行时的真正空间<br/>![WeChatd3e32e53877b8d3dbdb738042fcc7888.png](https://i.loli.net/2019/08/12/xFQEPcDtGJeIfgL.png)
+
+#### 7.1 JVM内存模型-JDK8-(线程私有内存部分)
+1. Java运行在虚拟机之上，运行时需要内存空间，虚拟机在运行程序的过程中，会将管理的内存空间划分为不同的内存区域方便管理。
+2. 从线程的角度去看，哪些内存时私有的<br/>
+	* 线程私有：程序计数器、虚拟机栈、本地方法栈
+	* 线程共享：MetaSpace、Java堆
+	* ![WeChat47a93c814fd6edcf752edc6bde221154.png](https://i.loli.net/2019/08/12/ZaKyPvI6n8wG39j.png)
+3. 程序计数器(Program Counter Register)，私有的
+	* 当前线程所执行的字节码行号指示器(逻辑)。**是逻辑计数器，非物理计数器**
+	* 改变计数器的值来选去下一条需要执行的字节码指令，包括分支、循环、跳转、异常处理、线程恢复等基础功能
+	* 和线程是一对一的关系，即"线程私有"，因为JVM的多线程是线程的轮流切换分配处理器执行时间的方式来实现的
+	* 对Java方法计数，如果是Native方法则计数器值为Undefined
+	* 不必安心内存泄漏
+	* **为了线程切换后都有正确的运行位置，每个线程都有字节独立的计数器。**
+4. Java虚拟机栈(Stack)，也是私有的
+	* Java方法执行的内存模型
+	* 包含多个栈针，栈针用于存储局部变量表、操作栈、动态连接、返回地址，每个虚拟机栈从入栈到出栈的过程
+	* 一般是当方法调用结束时，栈针才会被销毁，虚拟机栈包含了单个线程每个方法执行的栈针，栈针则存取了局部变量表，操作 数栈、动态连接和方法出口等信息。
+5. 本地方法栈
+	* 与虚拟机相似，主要用于标注了native的方法，例如之前的forName下的方法源码中的forName0的native方法。
+6. 局部变量表和操作数栈
+	* 局部变量表：包含方法执行过程中的所有变量。
+	* 操作数栈：入栈、出栈、复制、交换、产生消费变量。
+	* 对于栈的解析可以查看下面的代码和执行逻辑，每个小块代表一个栈针<br/>![WeChatd4e84df64a2d9771352fcf1874c3ae3b.png](https://i.loli.net/2019/08/12/XBgEGwrUcnRYNZQ.png)
+
+```
+// 代码
+public class ByteCodeSimple {
+	public static int add(int a, int b) {
+		int c = 0;
+		c = a + b;
+		return c;
+	}
+}
+// 通过javac编译
+javac ByteCodeSimple.java
+// 通过口语的形式进行反编译，可以看到add的方法，里面有stack=2，也就时操作数栈
+javap -verbose ByteCodeSimple.class
+```
+	
+ 
+
+#### 7.2 递归为什么会引发java.lang.StackOverflowError异常
+1. 实现一个最常见的斐波那契数列递归算法，计算普通的可以实现，但是当计算量过大的时候，`fibonacci(100000000);`的时候，就会出现**StackOverFlowError**
+2. 当线程执行一个方法的时候，就会对应的创建一个对应的栈针，并将对应的建立 栈针压入虚拟机栈中，当方法执行完毕的时候，便会将栈针出栈。
+3. 因此可知线程当前方法多对应的栈针必定位于Java栈的顶部，而我们的递归函数不断的调用自身
+	1. 每新调用一个方法就会生成一个栈针
+	2. 它会保存当前方法的栈针状态，将它放到虚拟机栈中
+	3. 栈针上下文切换的时候会切换到最新的方法栈针当中
+	4. 而每个虚拟机栈的深度是固定的，栈的帧数超出虚拟机栈的深度，就会爆出**StackOverFlowError**
+	5. **解决办法**：限制递归的次数、尽量使用循环
+4. 虚拟机栈过多会引发java.lang.OutOfMemoryError异常
+	1. 当虚拟机栈可以动态扩展时，如果无法申请足够多的内存，就会出现这个错误
+	2. 程序如下，但是windows尽量不要这么做，**容易死机**
+
+```
+public void stackLeakByThread() {
+    while (true) {
+        new Thread() {
+            public void run() {
+                while (true) {
+                }
+            }
+        }.start();
+    }
+}
+```
+
+
+#### 7.3 元空间(MetaSpace)与永久代(PermGen)的区别-(线程共享内存部分)
+1. 元空间和永久代都是储存class的相关信息，包括class对象的method等，实际上元空间和永久代均是方法区的实现，只是实现有所不同，方法区只是JVM的一种规范
+2. 在Java7，原先位于方法区的字符串常量池，已经被移到Java堆中，并且在Java中使用了元空间替代了永久代。
+
+1. 参考文献：[Java方法区、永久代、元空间、常量池详解](https://blog.csdn.net/u011635492/article/details/81046174)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
