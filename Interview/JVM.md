@@ -7,6 +7,7 @@
 - [五、类加载器的双亲委派机制](#Parental)
 - [六、类的加载方式](#loading)
 - [七、了解Java的内存模型么？](#memory)
+- [八、内存模型常考题解析](#question)
 
 
 ##### 2. 对Java的理解
@@ -170,6 +171,9 @@ protected final Class<?> defineClass(byte[] b, int off, int len) throws ClassFor
 
 
 ### <span id="memory">七、了解Java的内存模型么？</span>
+>HotSpot: 代指虚拟机<br/>
+>对于Java8， HotSpots取消了永久代，取代永久代的就是元空间
+
 1. 内存简介
 	* 计算机的所有内存都是运行在内存当中的
 	* 图释<br/>![WeChatc8118e2805f9ce1f9b830cd71749c768.png](https://i.loli.net/2019/08/12/fbBFgoUQlitMxqJ.png)  
@@ -180,6 +184,13 @@ protected final Class<?> defineClass(byte[] b, int off, int len) throws ClassFor
 2. 地址空间的划分
 	* **内核空间**，操作系统的程序和程序运行时的空间，包含连接计算机硬件，调度程序，以及联网和提供虚拟内存等服务的逻辑与C的进程。
 	* **用户空间**，Java操作运行时的真正空间<br/>![WeChatd3e32e53877b8d3dbdb738042fcc7888.png](https://i.loli.net/2019/08/12/xFQEPcDtGJeIfgL.png)
+
+3. **JVM内存模型**
+	* **堆**：堆是所有线程共享的，主要用来存储对象。分为年轻代、老年代两块区域，通过NewRadio参数设定比例。对于年轻代，一个Eden和两个Suvivor区，使用参数SuvivorRadio来设定大小；
+	* **Java虚拟机栈/本地方法栈**：线程私有的，主要存放局部变量表，操作数栈，动态连接和方法出口等；
+	* **程序计数器**：同样是线程私有的，记录当前线程的行号指示器，为线程的切换提供保障；
+	* **方法区**：线程共享的，主要储存类信息、常量池、静态变量、JIT编译后的代码等数据。方法区理论上来说是堆的逻辑组成部分；
+	* **运行时常量池**：是方法区的一部分，用于存放编译期生成的各种字面量和符号引用。
 
 #### 7.1 JVM内存模型-JDK8-(线程私有内存部分)
 1. Java运行在虚拟机之上，运行时需要内存空间，虚拟机在运行程序的过程中，会将管理的内存空间划分为不同的内存区域方便管理。
@@ -198,9 +209,9 @@ protected final Class<?> defineClass(byte[] b, int off, int len) throws ClassFor
 	* Java方法执行的内存模型
 	* 包含多个栈针，栈针用于存储局部变量表、操作栈、动态连接、返回地址，每个虚拟机栈从入栈到出栈的过程
 	* 一般是当方法调用结束时，栈针才会被销毁，虚拟机栈包含了单个线程每个方法执行的栈针，栈针则存取了局部变量表，操作 数栈、动态连接和方法出口等信息。
-5. 本地方法栈
+5. 本地方法栈，线程私有
 	* 与虚拟机相似，主要用于标注了native的方法，例如之前的forName下的方法源码中的forName0的native方法。
-6. 局部变量表和操作数栈
+6. 局部变量表和操作数栈，线程私有
 	* 局部变量表：包含方法执行过程中的所有变量。
 	* 操作数栈：入栈、出栈、复制、交换、产生消费变量。
 	* 对于栈的解析可以查看下面的代码和执行逻辑，每个小块代表一个栈针<br/>![WeChatd4e84df64a2d9771352fcf1874c3ae3b.png](https://i.loli.net/2019/08/12/XBgEGwrUcnRYNZQ.png)
@@ -249,22 +260,82 @@ public void stackLeakByThread() {
 ```
 
 
-#### 7.3 元空间(MetaSpace)与永久代(PermGen)的区别-(线程共享内存部分)
+#### 7.3 **元空间(MetaSpace)与永久代(PermGen)的区别**-(线程共享内存部分)
 1. 元空间和永久代都是储存class的相关信息，包括class对象的method等，实际上元空间和永久代均是方法区的实现，只是实现有所不同，方法区只是JVM的一种规范
 2. 在Java7，原先位于方法区的字符串常量池，已经被移到Java堆中，并且在Java中使用了元空间替代了永久代。
+3. **元空间与永久代的区别**
+	* **元空间使用本地内存，而永久代使用的是JVM的内存**，最常见的错误(java.lang.OutOfMemoryError: PermGen space)
 
-1. 参考文献：[Java方法区、永久代、元空间、常量池详解](https://blog.csdn.net/u011635492/article/details/81046174)
+4. **MetaSpace相比PermGen的优势**
+	* 字符串常量池存在永久代中，容易出现性能问题和内存溢出
+	* 类和方法的信息大小难以确定，给永久代的大小指定带来困难
+	* 永久代会为GC带来不必要的复杂度，并且回收效率偏低
+	* 方便HotSpot与其他JVM如Jrockit的集成
+
+#### 7.4 Java堆(Heap)
+1. 介绍
+	* 对象实力的分配区域
+	* 所有线程共享的一块内存区域
+	* 所有的对象实例的分配区域<br/>![WeChatea9c87d298faa426d4d9eeb879b3e1ac.png](https://i.loli.net/2019/08/16/uKXzxR1ZgCVLl8c.png)
+	* GC管理的主要区域<br/>![WeChatdb50a9ebcb626ce2869c7b59ab40fb1a.png](https://i.loli.net/2019/08/16/jh1SubfzJTkBm6C.png)
+
+#### 7.5 参考文献
+1. [Java方法区、永久代、元空间、常量池详解](https://blog.csdn.net/u011635492/article/details/81046174)
+2. [JAVA8内存模型](https://www.jianshu.com/p/258fd5b6734a)
 
 
+### 八、<span id="question">内存模型常考题解析</span>
+
+#### 8.1 JVM 三大性能调优参数-Xms -Xmx -Xss的含义？
+1. 常用的指令如：`java -Xms128m -Xmx128m -Xss256k -jar xxxx.jar`
+	* **-Xss：规定了每个线程虚拟机栈(堆栈)的大小**，会影响并发线程数的大小
+	* **-Xms：堆的初始值**，刚创建出来的时候专属Java堆的大小，一旦对象容量超出Java堆的初始容量，堆会自动扩容，扩容到-Xmx的大小
+	* **-Xmx：堆能达到的最大值**
+
+2. **一般都将-Xms和-Xmx设置成一样的，因为扩容时会发生内存抖动，影响程序运行时的稳定性**
+
+#### 8.2 Java内存模型中堆和栈的区别--内存分配策略
+1. 内存分配策略
+	1. **静态存储**：编译时确定每个数据目标在运行时的存储空间需求，在编译时就可以分配固定的内存空间
+	2. **栈式存储**：数据区需求在编译时未知，运行时模块入口前确定
+	3. **堆式存储**：编译时或运行时模块入口都无法确定，动态分配
+
+2. Java内存模型中堆和栈的**联系**
+	* 联系：引用对象、数组时，栈里定义变量保存堆中目标的首地址<br/>![WeChat9bae803d84350df143aaf6f1392b2d1d.png](https://i.loli.net/2019/08/16/Cyu7dA28BqQMXkG.png)
+
+3. 堆和栈的区别
+	* 管理方式：栈自动释放，堆需要GC
+	* 空间大小：栈比堆小
+	* 碎片相关：栈产生的碎片远小于堆
+	* 分配方式：栈支持静态和动态分配，堆仅支持动态分配
+	* 效率：栈的效率比堆高
 
 
+#### 8.3 元空间、堆、线程独占部分之间的联系--内存角度
+1. 程序示例<br/>![WeChat546411d33c4f0e8bea3624843f379647.png](https://i.loli.net/2019/08/16/x1TZmqcvdypKSFO.png)
+2. 元空间：
+	* Class: HelloWorld - Method: sayHello\setName\main - Field: name
+	* Class: System类
+3. Java堆：
+	* Object：String("test")对象实例
+	* Object：HelloWorld
+4. 线程独占
+	* Parameter reference: "test" to String object
+	* Variable reference: "hw" to HelloWorld object
+	* Local Variables: a with 1, lineNo(行号)
 
+#### 8.4 不同JDK版本之间的intern()方法的区别--JDK6 vs JDK6+(7、8、9)
+1. intern()方法的使用
+```
+String s = new String("a");
+s.intern();
+```
+2. JDK6: 当调用intern方法时，如果字符串常量池先前已创建出该字符串对象，则返回池中的该字符串的引用。否则，将此字符串对象添加到字符串常量池中，并且返回该字符串的对象引用。(字符串常量池存在于永久代中)
+3. JDK6+: 当调用intern方法时，如果字符串常量池先前将已创建出该字符串对象，则返回池中的该字符串的引用。否则，如果该字符串对象已经存在于Java堆中，则将堆中对此对象的引用添加到字符串常量池中，并且返回该引用；如果堆中不存在，则在池中创建该字符串并返回其引用。(这个常量池就不受永久代的约束了)
 
+4. 例子解释 - JDK6 - false、false<br/>![WeChatad410395ed68edb471fc4e31d13d6244.png](https://i.loli.net/2019/08/16/fFcA9nNDU7YmrxW.png)
 
-
-
-
-
+5. 例子解释 - JDK7 - false、true<br/>![WeChat2f00bc1099421bcae90e26e9e54e30b4.png](https://i.loli.net/2019/08/16/cio1IBjSD8OhQWx.png)
 
 
 
